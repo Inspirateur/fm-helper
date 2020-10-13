@@ -10,28 +10,14 @@ def print_bin(load):
 
 class DofusListener:
 	def __init__(self, callback):
-		self._buffer = []
-		self._id = None
-		self._len = None
 		self.callback = callback
 		print("listening to dofus packet ...")
-		scapy.sniff(prn=self.handle, filter=f"src port {PORT}")
+		scapy.sniff(prn=self.handle, filter=f"tcp src port {PORT}")
 
 	def handle(self, pkt: scapy.Packet):
 		# if there's data in the packet
 		if scapy.Raw in pkt:
 			load = pkt[scapy.Raw].load
-			# completing a message from an earlier packet
-			if self._buffer:
-				if self._len <= len(load):
-					self._buffer.append(load[:self._len])
-					self.callback(DofusPacket(self._id, b"".join(self._buffer)))
-					self._buffer.clear()
-					load = load[self._len:]
-				else:
-					self._buffer.append(load)
-					self._len -= len(load)
-					return
 			# normal parsing of the packet
 			while len(load):
 				head = int.from_bytes(load[0:2], byteorder="big")
@@ -39,19 +25,10 @@ class DofusListener:
 				lentype = head & 3
 				lenmsg = int.from_bytes(load[2:2+lentype], byteorder="big")
 				lenload = len(load) - (2+lentype)
-				if lenmsg <= lenload:
-					self.callback(DofusPacket(msg_id, load[2+lentype:2+lentype+lenmsg]))
-					load = load[2+lentype+lenmsg:]
-				else:
-					self._id = msg_id
-					self._len = lenmsg-lenload
-					self._buffer.append(load[2+lentype:])
+				if lenmsg > lenload:
 					break
-			# basic error management
-			if self._len and self._len > 10**4:
-				print(f"Read message length {self._len:,} - probably missed the real header, skipping.")
-				self._buffer.clear()
-				self._len = None
+				self.callback(DofusPacket(msg_id, load[2 + lentype:2 + lentype + lenmsg]))
+				load = load[2 + lentype + lenmsg:]
 
 
 class DofusPacket:

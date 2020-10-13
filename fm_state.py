@@ -17,6 +17,9 @@ class Item:
 	def __len__(self):
 		return len(self._stats)
 
+	def __str__(self):
+		return f"{self.id} {dict(self._stats)}"
+
 	def keys(self):
 		return self._stats.keys()
 
@@ -82,7 +85,7 @@ class FMState:
 			print(f"added an item/rune {item}")
 			print(pkt)
 		elif pkt.id == dp.DofusPacket.ID_REMOVED:
-			item_id = pkt[-5:-3]
+			item_id = pkt[1:3]
 			if item_id in self.slots:
 				self.last_remove = self.slots[item_id]
 			self.slots.pop(item_id, None)
@@ -111,20 +114,23 @@ class FMState:
 					if new_stat:
 						delta_stats[statname] = new_stat
 						poids[statname] = self.item_info[stat]["poids"]
-			# compute the delta pool
-			if pkt[-1] == 1:
-				# the pool didn't change
-				delta_pool = 0
-			else:
-				# the pool did change
-				delta_pool = -sum(delta*poids[stat] for stat, delta in delta_stats.items())
-				# TODO: verifier le delire ou y a marque +reliquat mais en fait non
-				if pkt[0] != 2:
-					# it was a failure, we pay the rune cost
-					delta_pool -= rune[list(rune.keys())[0]]
 
-			self.pools[new_item["id"]] += delta_pool
-			if self.pools[new_item["id"]] < 0:
-				self.pools[new_item["id"]] = 0
-			print(f"FM'ed item - new pool {self.pools[new_item['id']]} - delta {delta_stats} ")
+			# update the pool
+			if pkt[-1] != 1:
+				# the pool changed
+
+				# we compute the gain or loss incurred by stat changes
+				self.pools[new_item["id"]] -= sum(delta*poids[stat] for stat, delta in delta_stats.items())
+				# clamp the pool to 0 again
+				if self.pools[new_item["id"]] < 0:
+					self.pools[new_item["id"]] = 0
+
+				if pkt[0] != 2:
+					# it was a failure, we pay the rune cost if enough pool is left
+					rune_id = list(rune.keys())[0]
+					rune_cost = rune[rune_id]*self.item_info[rune_id]["poids"]
+					if self.pools[new_item["id"]] >= rune_cost:
+						self.pools[new_item["id"]] -= rune_cost
+
+			print(f"FM'ed item - new pool {self.pools[new_item['id']]:.2f} - delta {dict(delta_stats)} ")
 			print(pkt)

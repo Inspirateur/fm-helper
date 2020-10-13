@@ -48,13 +48,14 @@ class DofusListener:
 					self._buffer.append(load[2+lentype:])
 					break
 			# basic error management
-			if self._len and self._len > 10**3:
-				print("Read a non-sensical message length, probably missed the real header, resetting.")
+			if self._len and self._len > 10**4:
+				print(f"Read message length {self._len:,} - probably missed the real header, skipping.")
 				self._buffer.clear()
+				self._len = None
 
 
 class DofusPacket:
-	ID_FM_ITEM = 8399
+	ID_FM_ITEM = 819
 	ID_START_FM = 7187
 	ID_ADD = 88
 	ID_REMOVED = 1377
@@ -68,5 +69,7 @@ class DofusPacket:
 
 	def __getitem__(self, item):
 		if isinstance(item, int):
+			if item < 0:
+				item = len(self.msg)+item
 			item = slice(item, item+1)
 		return int.from_bytes(self.msg[item], byteorder="big")

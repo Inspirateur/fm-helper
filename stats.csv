@@ -1,0 +1,51 @@
+id,name,poids
+238,Ini,0.1
+125,Vita,0.2
+222,Pod,0.25
+118,Force,1
+119,Agi,1
+123,Chance,1
+126,Intel,1
+202,Pui,2
+304,Re Terre,2
+305,Re Eau,2
+306,Re Air,2
+307,Re Feu,2
+308,Re Neutre,2
+352,Re Pou,2
+356,Re Cri,2
+124,Sag,3
+240,Prospe,3
+561,Tacle,4
+560,Fuite,4
+358,Do Terre,5
+360,Do Feu,5
+362,Do Eau,5
+364,Do Air,5
+366,Do Neutre,5
+350,Do Pou,5
+354,Do Cri,5
+275,Do Pi,5
+274,Re Terre%,6
+277,Re Feu%,6
+275,Re Eau%,6
+276,Re Air%,6
+278,Re Neutre%,6
+224,Re PA,7
+225,Re PM,7
+346,Ret PA,7
+348,Ret PM,7
+242,Soin,10
+115,Cri%,10
+284,Do ren,10
+1588,Do Di%,15
+1592,Do Ar%,15
+1584,Do CaC%,15
+1596,Do So%,15
+1591,Re Di%,15
+1587,Re Me%,15
+112,Do,20
+246,Invo,30
+117,PO,51
+192,PM,90
+111,PA,100

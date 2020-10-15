@@ -6,10 +6,10 @@ import dofus_protocol as dp
 class Item:
 	def __init__(self, item_id, stats):
 		self.id = item_id
-		self._stats = stats
+		self.stats: dict = stats
 
 	@staticmethod
-	def from_packet(pkt: dp.DofusPacket, offset):
+	def from_packet(pkt: dp.DofusPacket, offset) -> "Item":
 		# skip the first or second byte
 		i = offset
 		if pkt[i] >= 128:
@@ -53,19 +53,25 @@ class Item:
 		return Item(item_id, stats)
 
 	def __getitem__(self, item):
-		return self._stats[item]
+		return self.stats[item]
 
 	def __setitem__(self, key, value):
-		self._stats[key] = value
+		self.stats[key] = value
 
 	def __len__(self):
-		return len(self._stats)
+		return len(self.stats)
 
 	def __str__(self):
-		return f"{self.id} {dict(self._stats)}"
+		return f"{self.id} {dict(self.stats)}"
 
 	def keys(self):
-		return self._stats.keys()
+		return self.stats.keys()
+
+	def values(self):
+		return self.stats.values()
+
+	def items(self):
+		return self.stats.items()
 
 
 def delta_str(delta_stats: dict):
@@ -87,13 +93,19 @@ class FMState:
 			for row in list(stats)[1:]:
 				self.item_info[int(row[0])] = {"name": row[1], "poids": float(row[2])}
 
+	def stats_str(self, stats: dict):
+		return {
+			(self.item_info[stat_id]["name"] if stat_id in self.item_info else stat_id): value
+			for stat_id, value in stats.items()
+		}
+
 	def update(self, pkt: dp.DofusPacket):
 		if pkt.id == dp.DofusPacket.ID_START_FM:
 			print("opened craft window")
 		elif pkt.id == dp.DofusPacket.ID_ADD:
 			item = Item.from_packet(pkt, 4)
 			self.slots[item.id] = item
-			print(f"added an item/rune {item}")
+			print(f"added an item/rune {item.id} {self.stats_str(item.stats)}")
 			# print(pkt)
 		elif pkt.id == dp.DofusPacket.ID_REMOVED:
 			item_id = pkt[1:3]
@@ -123,30 +135,29 @@ class FMState:
 				rune = self.last_remove
 			# compute the delta stats
 			delta_stats = {}
-			poids = {}
 			for stat in set(new_item.keys()) | set(old_item.keys()):
 				if stat in self.item_info:
-					statname = self.item_info[stat]["name"]
 					new_stat = new_item[stat] - old_item[stat]
 					if new_stat:
-						delta_stats[statname] = new_stat
-						poids[statname] = self.item_info[stat]["poids"]
+						delta_stats[stat] = new_stat
 
 			# update the pool
 			if pkt[-1] != 1:
 				# the pool changed
-
 				# we compute the gain or loss incurred by stat changes
-				self.pools[new_item["id"]] -= sum(delta*poids[stat] for stat, delta in delta_stats.items())
+				self.pools[new_item.id] -= sum(
+					delta*self.item_info[stat_id]["poids"]
+					for stat_id, delta in delta_stats.items()
+				)
 				# clamp the pool to 0 again
-				if self.pools[new_item["id"]] < 0:
-					self.pools[new_item["id"]] = 0
+				if self.pools[new_item.id] < 0:
+					self.pools[new_item.id] = 0
 
 				if pkt[0] != 2:
 					# it was a failure, we pay the rune cost if enough pool is left
-					rune_id = list(rune.keys())[0]
-					rune_cost = rune[rune_id]*self.item_info[rune_id]["poids"]
-					if self.pools[new_item["id"]] >= rune_cost:
-						self.pools[new_item["id"]] -= rune_cost
+					stat_id = list(rune.keys())[0]
+					rune_cost = rune[stat_id]*self.item_info[stat_id]["poids"]
+					if self.pools[new_item.id] >= rune_cost:
+						self.pools[new_item.id] -= rune_cost
 
-			print(f"> FM'ed item - new pool {self.pools[new_item['id']]:.2f} - {delta_str(delta_stats)}")
+			print(f"> FM'ed item - new pool {self.pools[new_item.id]:.2f} - {delta_str(self.stats_str(delta_stats))}")

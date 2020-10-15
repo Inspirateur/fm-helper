@@ -68,6 +68,12 @@ class Item:
 		return self._stats.keys()
 
 
+def delta_str(delta_stats: dict):
+	if not delta_stats:
+		return "no stat changes"
+	return ", ".join(f"{s}: {v:+}" for s, v in delta_stats.items())
+
+
 class FMState:
 	def __init__(self):
 		self.history = []
@@ -100,6 +106,12 @@ class FMState:
 			# retrieve the item
 			new_item = Item.from_packet(pkt, 2)
 			# retrieve the old item
+			if new_item.id not in self.slots:
+				print(
+					"I didn't see which item was being FM'ed so I can't update the pool, "
+					"please put the item in the slot again and retry."
+				)
+				return
 			old_item = self.slots[new_item.id]
 			self.slots[new_item.id] = new_item
 			# retrieve the rune
@@ -137,4 +149,4 @@ class FMState:
 					if self.pools[new_item["id"]] >= rune_cost:
 						self.pools[new_item["id"]] -= rune_cost
 
-			print(f"FM'ed item - new pool {self.pools[new_item['id']]:.2f} - delta {dict(delta_stats)} ")
+			print(f"> FM'ed item - new pool {self.pools[new_item['id']]:.2f} - {delta_str(delta_stats)}")

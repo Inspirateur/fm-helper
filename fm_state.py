@@ -1,5 +1,5 @@
 from collections import defaultdict
-import pandas as pd
+import csv
 import dofus_protocol as dp
 
 
@@ -8,32 +8,8 @@ class Item:
 		self.id = item_id
 		self._stats = stats
 
-	def __getitem__(self, item):
-		return self._stats[item]
-
-	def __setitem__(self, key, value):
-		self._stats[key] = value
-
-	def __len__(self):
-		return len(self._stats)
-
-	def __str__(self):
-		return f"{self.id} {dict(self._stats)}"
-
-	def keys(self):
-		return self._stats.keys()
-
-
-class FMState:
-	def __init__(self):
-		self.history = []
-		self.slots = {}
-		self.last_remove = None
-		self.pools = defaultdict(float)
-		# read the stats.csv here
-		self.item_info = pd.read_csv("stats.csv", index_col=0).to_dict("index")
-
-	def read_item(self, pkt: dp.DofusPacket, offset):
+	@staticmethod
+	def from_packet(pkt: dp.DofusPacket, offset):
 		# skip the first or second byte
 		i = offset
 		if pkt[i] >= 128:
@@ -76,24 +52,53 @@ class FMState:
 		item_id = pkt[i:i+2]
 		return Item(item_id, stats)
 
+	def __getitem__(self, item):
+		return self._stats[item]
+
+	def __setitem__(self, key, value):
+		self._stats[key] = value
+
+	def __len__(self):
+		return len(self._stats)
+
+	def __str__(self):
+		return f"{self.id} {dict(self._stats)}"
+
+	def keys(self):
+		return self._stats.keys()
+
+
+class FMState:
+	def __init__(self):
+		self.history = []
+		self.slots = {}
+		self.last_remove = None
+		self.pools = defaultdict(float)
+		# read the stats.csv here
+		self.item_info = {}
+		with open("stats.csv", "r") as fstats:
+			stats = csv.reader(fstats)
+			for row in list(stats)[1:]:
+				self.item_info[int(row[0])] = {"name": row[1], "poids": float(row[2])}
+
 	def update(self, pkt: dp.DofusPacket):
 		if pkt.id == dp.DofusPacket.ID_START_FM:
 			print("opened craft window")
 		elif pkt.id == dp.DofusPacket.ID_ADD:
-			item = self.read_item(pkt, 4)
+			item = Item.from_packet(pkt, 4)
 			self.slots[item.id] = item
 			print(f"added an item/rune {item}")
-			print(pkt)
+			# print(pkt)
 		elif pkt.id == dp.DofusPacket.ID_REMOVED:
 			item_id = pkt[1:3]
 			if item_id in self.slots:
 				self.last_remove = self.slots[item_id]
 			self.slots.pop(item_id, None)
 			print(f"removed item/rune {item_id}")
-			print(pkt)
+			# print(pkt)
 		elif pkt.id == dp.DofusPacket.ID_FM_ITEM:
 			# retrieve the item
-			new_item = self.read_item(pkt, 2)
+			new_item = Item.from_packet(pkt, 2)
 			# retrieve the old item
 			old_item = self.slots[new_item.id]
 			self.slots[new_item.id] = new_item
@@ -133,4 +138,3 @@ class FMState:
 						self.pools[new_item["id"]] -= rune_cost
 
 			print(f"FM'ed item - new pool {self.pools[new_item['id']]:.2f} - delta {dict(delta_stats)} ")
-			print(pkt)
